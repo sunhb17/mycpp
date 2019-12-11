@@ -23,13 +23,16 @@ bool validateIPChecksum(uint8_t *packet, size_t len) {
 
 	for(int i=0;i<ip_len;i+=2){
 		checksum += ((packet[i] << 8) + packet[i+1]);
+		while(checksum>>16!=0){
+			checksum = (checksum & 0xffff) + (checksum >> 16);
+		}
 	}
 
-	while(checksum>>16!=0){
-		checksum = (checksum & 0xffff) + (checksum >> 16);
-	}
+	
 
 	check_sum = ~checksum;
+	packet[11] = ans % 256;
+	packet[10] = ans >> 8;
 	if(check_sum==ans)
 		return true;
 	else
@@ -46,16 +49,20 @@ bool forward(uint8_t *packet, size_t len) {
 
 	packet[8] -= 1;
 
+	packet[10] = 0;
+	packet[11] = 0;
+
 	int ip_len = (packet[0] << 2) % 64;
 
 
 	for(int i=0;i<ip_len;i+=2){
 		checksum += ((packet[i] << 8) + packet[i+1]);
+		while(checksum>>16!=0){
+			checksum = (checksum & 0xffff) + (checksum >> 16);
+		}
 	}
 
-	while(checksum>>16!=0){
-		checksum = (checksum & 0xffff) + (checksum >> 16);
-	}
+	
 
 	check_sum = ~checksum;
 	packet[11] = (check_sum & 0xff);
