@@ -24,7 +24,6 @@ bool validateIPChecksum(uint8_t *packet, size_t len) {
 		}
 	}
 	check_sum = ~checksum;
-	packet -= ip_len;
 	packet[10] = ans % 256;
 	packet[11] = ans >> 8;
 	if(check_sum==ans)
