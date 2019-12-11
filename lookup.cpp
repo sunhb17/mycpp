@@ -103,7 +103,7 @@ bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index, uint32_t *metri
   for (int i=0;i<RoutingTable.size();i++){
     uint32_t _addr = Netaddr(RoutingTable[i]);
     if(RoutingTable[i].len<=m_len)continue;
-    else if(_addr == (Mask(now.len)&addr)){
+    else if(_addr == (Mask(RoutingTable[i].len)&addr)){
       locate = i;
       m_len = RoutingTable[i].len;
     }
