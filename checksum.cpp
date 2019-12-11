@@ -8,7 +8,7 @@
  * @return 校验和无误则返回 true ，有误则返回 false
  */
 bool validateIPChecksum(uint8_t *packet, size_t len) {
-	unsigned int ans = (packet[11]<<8) + packet[10];
+	unsigned int ans = (packet[10]<<8) + packet[11];
 	unsigned short check_sum = 0;
 	unsigned int checksum = 0;
 
@@ -18,14 +18,14 @@ bool validateIPChecksum(uint8_t *packet, size_t len) {
 	int ip_len = (packet[0] << 2) % 64;
 
 	for(int i=0;i<ip_len;i+=2){
-		checksum += ((packet[i+1] << 8) + packet[i]);
+		checksum += ((packet[i] << 8) + packet[i+1]);
 		while(checksum>>16!=0){
 			checksum = (checksum & 0xffff) + (checksum >> 16);
 		}
 	}
 	check_sum = ~checksum;
-	packet[10] = ans % 256;
-	packet[11] = ans >> 8;
+	packet[11] = ans % 256;
+	packet[10] = ans >> 8;
 	if(check_sum==ans)
 		return true;
 	else
