@@ -58,7 +58,7 @@ void update(bool insert, RoutingTableEntry entry) {
   else{
     for(int i=0;i<RoutingTable.size();i++){
       if(RoutingTable[i].addr==entry.addr && RoutingTable[i].len==entry.len){
-        RoutingTable.erase(RoutingTable.begin()+i)
+        RoutingTable.erase(RoutingTable.begin()+i);
         return;
       }
     }
