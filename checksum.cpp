@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include <cstdio>
 
 /**
  * @brief 进行 IP 头的校验和的验证
@@ -9,23 +8,28 @@
  * @return 校验和无误则返回 true ，有误则返回 false
  */
 bool validateIPChecksum(uint8_t *packet, size_t len) {
-	
+	unsigned int ans = (packet[11]<<8) + packet[10];
+	unsigned short check_sum = 0;
 	unsigned int checksum = 0;
-	unsigned short cksum = 0;
-	unsigned int answer = (packet[10] << 8) + packet[11];
+
 	packet[10] = 0;
 	packet[11] = 0;
-	int iplen = (packet[0] % 16) << 2;
-	for(int i = 0; i < iplen; i+=2){
-		checksum += ((packet[i] << 8) + packet[i+1]);
+
+	int ip_len = (packet[0] << 2) % 64;
+
+	for(int i=0;i<ip_len;i+=2){
+		checksum += ((packet[i+1] << 8) + packet[i]);
+		while(checksum>>16!=0){
+			checksum = (checksum & 0xffff) + (checksum >> 16);
+		}
 	}
-	checksum = (checksum & 0xffff) + (checksum >> 16);
-	checksum += (checksum >> 16);
-	cksum = ~checksum;
-	if(cksum == answer){
+	check_sum = ~checksum;
+	packet -= ip_len;
+	packet[10] = ans % 256;
+	packet[11] = ans >> 8;
+	if(check_sum==ans)
 		return true;
-	}
-	else {
+	else
 		return false;
-	}
+
 }
