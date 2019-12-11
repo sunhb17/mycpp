@@ -73,26 +73,26 @@ void update(bool insert, RoutingTableEntry entry) {
  * @param if_index 如果查询到目标，把表项的 if_index 写入
  * @return 查到则返回 true ，没查到则返回 false
  */
-bool is_same(uint32_t addr, uint32_t RoutingTable_addr, int len){
-  int t = len / 8;
-  int left = len % 8;
-  while(t){
-    t--;
-    if((addr&0xff)==(RoutingTable_addr&0xff)){
-      RoutingTable_addr = RoutingTable_addr >> 8;
-      addr = addr >> 8;
-    }
-    else 
-      return false;
-  }
+// bool is_same(uint32_t addr, uint32_t RoutingTable_addr, int len){
+//   int t = len / 8;
+//   int left = len % 8;
+//   while(t){
+//     t--;
+//     if((addr&0xff)==(RoutingTable_addr&0xff)){
+//       RoutingTable_addr = RoutingTable_addr >> 8;
+//       addr = addr >> 8;
+//     }
+//     else 
+//       return false;
+//   }
 
-  if(left){
-    if(addr%(1<<k)==RoutingTable_addr) return true;
-    else return false;
-  }
+//   if(left){
+//     if(addr%(1<<k)==RoutingTable_addr) return true;
+//     else return false;
+//   }
 
-  return true;
-}
+//   return true;
+// }
 
 
 bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index, uint32_t *metric) {
@@ -101,8 +101,9 @@ bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index, uint32_t *metri
   int locate = -1;
 
   for (int i=0;i<RoutingTable.size();i++){
+    uint32_t _addr = Netaddr(RoutingTable[i]);
     if(RoutingTable[i].len<=m_len)continue;
-    else if(is_same(addr, RoutingTable[i].addr, RoutingTable[i].len)){
+    else if(_addr == (Mask(now.len)&addr)){
       locate = i;
       m_len = RoutingTable[i].len;
     }
