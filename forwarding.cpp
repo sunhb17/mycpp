@@ -14,7 +14,7 @@ using namespace std;
  * @return 校验和无误则返回 true ，有误则返回 false
  */
 
-bool validateIPChecksum(uint8_t *packet, size_t len) {
+bool validateIPChecksum2(uint8_t *packet, size_t len) {
 	unsigned int ans = (packet[10]<<8) + packet[11];
 	unsigned short check_sum = 0;
 	unsigned int checksum = 0;
@@ -30,9 +30,6 @@ bool validateIPChecksum(uint8_t *packet, size_t len) {
 			checksum = (checksum & 0xffff) + (checksum >> 16);
 		}
 	}
-
-	
-
 	check_sum = ~checksum;
 	packet[11] = ans % 256;
 	packet[10] = ans >> 8;
@@ -79,7 +76,7 @@ pair<bool, uint16_t> validateIPChecksum1(uint8_t *packet, size_t len) {
 
 
 bool forward(uint8_t *packet, size_t len) {
-	if(validateIPChecksum(packet,len)==false)
+	if(validateIPChecksum2(packet,len)==false)
 		return false;
 
 	unsigned int checksum = 0;
