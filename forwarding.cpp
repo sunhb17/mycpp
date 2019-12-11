@@ -97,8 +97,6 @@ bool forward(uint8_t *packet, size_t len) {
 		}
 	}
 
-	
-
 	check_sum = ~checksum;
 	packet[11] = (check_sum & 0xff);
 	packet[10] = (check_sum & 0xffff) >> 8;
