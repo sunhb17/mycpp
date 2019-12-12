@@ -7,7 +7,7 @@
   #define RIP_MAX_ENTRY 25
   typedef struct {
     // all fields are big endian
-    // we don't store 'family', as it is always 2(for response) and 0(for request)
+    // we don't store 'family', as it is always 2(response) and 0(request)
     // we don't store 'tag', as it is always 0
     uint32_t addr;
     uint32_t mask;
@@ -39,86 +39,58 @@
  * IP 包的 Total Length 长度可能和 len 不同，当 Total Length 大于 len 时，把传入的 IP 包视为不合法。
  * 你不需要校验 IP 头和 UDP 的校验和是否合法。
  * 你需要检查 Command 是否为 1 或 2，Version 是否为 2， Zero 是否为 0，
- * Family 和 Command 是否有正确的对应关系（见上面结构体注释），Tag 是否为 0，
+ * Family 和 Command 是否有正确的对应关系，Tag 是否为 0，
  * Metric 转换成小端序后是否在 [1,16] 的区间内，
  * Mask 的二进制是不是连续的 1 与连续的 0 组成等等。
  */
-
-bool is_mask(uint32_t mask){
-  uint32_t test = 0;
-
-  for(int i=0;i<4;i++){
-    test += (mask&0xff) << (8 * (3 - i));
-    mask = mask >> 8;
-  }
-  mask = test;
-  mask = ~mask;
-  while(mask!=0){
-    if((mask&0x1)==0x1){
-      mask = mask >> 1;
-    }
-    else return false;
-  }
-  return true;
-}
-
-
 bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output) {
-
-  int total_length = packet[3];
-  if(total_length>len)
-    return false;
-
-  int ip_len = (packet[0] & 0xf);
-  int command = 4 * ip_len + 8;
-  if(packet[command]!=1&&packet[command]!=2)    
-    return false;
-
-  if(packet[command+1]!=2)      
-    return false;
-
-  if(packet[command+2]||packet[command+3])
-    return false;
-
-  int entry = (total_length - ip_len - 8) / 20;
-  output->command = packet[command];
-  output->numEntries = entry;
-
-  for(int i=0;i<entry;i++){
-    int zero = i * 20 + 4 + command;
-    int family = packet[zero+1] + (packet[zero] << 8);
-
-    if((packet[command]==1&&family==0)||(packet[command]==2&&family==2)){
-      if((packet[zero+3] + (packet[zero+2]<<8))==0){
-        output->entries[i].addr = 0;
-        uint32_t mask = 0;
-        for(int j=0;j<8;j++){
-          if (j<4) output->entries[i].addr += packet[zero+j+4] << (8 * j);
-          else mask += packet[zero+j+4] << (8 * (j - 4));
-        }
-        if(is_mask(mask)){
-          output->entries[i].mask = mask;
-          output->entries[i].nexthop = 0;
-          uint32_t metric = 0;
-          for(int j=0;j<8;j++){
-            if (j<4) output->entries[i].nexthop += packet[zero+j+12] << (8 * j);
-            else metric += packet[zero+j+12] << (8 * (7 - j));
-          }
-          if(metric>0&&metric<17){
-            output->entries[i].metric = 0;
-            for(int j=0;j<4;j++){
-              output->entries[i].metric += packet[zero+j+16] << (8 * j);
-            }
-            continue;
-          }
-        }
-      }
+    int total_len = packet[3];
+    //Total Length 大于 len 时，把传入的 IP 包视为不合法
+    if(total_len > len) return false;
+    int iphead_len = (packet[0] & 0xf) * 4; 
+    int command, version, zero[2], family, tag[2], metric, mask, addr, nexthop;
+    //检查 Command 是否为 1 或 2
+    command = iphead_len+8;
+    if(packet[command] != 1 && packet[command] != 2) return false;
+    //Version 是否为 2
+    version = iphead_len+8+1;
+    if(packet[version] != 2) return false;
+    // Zero 是否为 0
+    zero[0] = iphead_len+8+2;
+    zero[1] = iphead_len+8+3;
+    if(packet[zero[0]] || packet[zero[1]]) return false;    
+    //推断包的个数
+    int packet_num = (total_len - iphead_len- 8) / 20;
+    output->numEntries = packet_num;
+    output->command = packet[command];
+    for(int i  = 0; i < packet_num; i++){
+      int pzero = zero[1] + i * 20 + 1;
+      //Family 和 Command 是否有正确的对应关系
+      family = pzero;
+      int family_value = (packet[family] << 8) + packet[family+1];
+      if(!((packet[command] == 1 && family_value == 0) || (packet[command] == 2 && family_value == 2))) return false;
+      //Tag 是否为 0
+      tag[0] = pzero + 2;
+      tag[1] = pzero + 3;
+      if(packet[tag[0]] || packet[tag[1]]) return false;
+      //addr;
+      addr = pzero + 4;      
+      output->entries[i].addr = (packet[addr+3] << 24) + (packet[addr+2] << 16) + (packet[addr+1] << 8) +packet[addr];
+      //Mask 的二进制是不是连续的 1 与连续的 0 组成等等    
+      mask = pzero + 8;
+      uint32_t mask_value = (packet[mask+3] << 24) + (packet[mask+2] << 16) + (packet[mask+1] << 8) +packet[mask+0];
+      if((1 != __builtin_popcount((mask_value) + 1))) return false;
+      output->entries[i].mask = mask_value;
+      //nexthop;
+      nexthop = pzero + 12;
+      output->entries[i].nexthop = (packet[nexthop+3] << 24) + (packet[nexthop+1] << 16) + (packet[nexthop+1] << 8) +packet[nexthop];
+      //Metric 转换成小端序后是否在 [1,16] 的区间内
+      metric = pzero + 16;
+      uint32_t metric_velue = (packet[metric] << 24) + (packet[metric+1] << 16) + (packet[metric+2] << 8) +packet[metric+3];
+      if(metric_velue < 1 || metric_velue > 16) return false;
+      output->entries[i].metric = (packet[metric+3] << 24) + (packet[metric+2] << 16) + (packet[metric+1] << 8) +packet[metric];
     }
-    return false;
-    
-  }
-  return true;
-
+    return true;
 }
 
 /**
@@ -132,46 +104,41 @@ bool disassemble(const uint8_t *packet, uint32_t len, RipPacket *output) {
  * 需要注意一些没有保存在 RipPacket 结构体内的数据的填写。
  */
 uint32_t assemble(const RipPacket *rip, uint8_t *buffer) {
-  buffer[0] = rip->command;
-  buffer[1] = 2;
-  buffer[2] = 0;
-  buffer[3] = 0;
-
-  int numEntries = rip->numEntries;
-  int len = numEntries * 20 + 4;
-
-  for(int i=0;i<numEntries;i++){
-    int head = i * 20 + 4;
-
-    buffer[head] = 0;
-    buffer[head+1] = 2 * rip->command - 2;
-
-    buffer[head+2] = 0;
-    buffer[head+3] = 0;
-
-    uint32_t tmp = rip->entries[i].addr;
-    for(int j=0;j<4;j++){
-      buffer[head+4+j] = tmp & 0xff;
-      tmp = tmp >> 8;
+    buffer[0] = rip->command;
+    buffer[1] = 2;
+    buffer[2] = buffer[3] = 0;
+    for(int i = 0; i < rip->numEntries; i++){
+      int zero = 4 + i * 20;
+      buffer[zero] = 0;
+      if (rip->command == 2) buffer[zero + 1] = 2;
+      else if(rip->command == 1) buffer[zero + 1] = 0;
+      buffer[zero + 2] = buffer[zero + 3] = 0;
+      //addr
+      uint32_t temp;
+      temp = rip->entries[i].addr;
+      for (int j = 0; j < 4; j++){
+        buffer[zero+4+j] = (temp & 0xff);
+        temp = temp >> 8;
+      }
+      //mask
+      temp = rip->entries[i].mask;
+      for (int j = 0; j < 4; j++){
+        buffer[zero+8+j] = (temp & 0xff);
+        temp = temp >> 8;
+      }      
+      //nexthop
+      temp = rip->entries[i].nexthop;
+      for (int j = 0; j < 4; j++){
+        buffer[zero+12+j] = (temp & 0xff);
+        temp = temp >> 8;
+      }  
+      //metric
+      temp = rip->entries[i].metric;
+      for (int j = 0; j < 4; j++){
+        buffer[zero+16+j] = (temp & 0xff);
+        temp = temp >> 8;
+      }  
     }
-    tmp = rip->entries[i].mask;
-    for(int j=0;j<4;j++){
-      buffer[head+8+j] = tmp & 0xff;
-      tmp = tmp >> 8;
-    }
-    tmp = rip->entries[i].nexthop;
-    for(int j=0; j<4;j++){
-      buffer[head+12+j] = tmp & 0xff;
-      tmp = tmp >> 8;
-    }
-    tmp = rip->entries[i].metric;
-    for(int j=0; j<4; j++){
-      buffer[head+16+j] = tmp & 0xff;
-      tmp = tmp >> 8;
-    }
-
-
-    
-  }
-  return len;
+    // TODO:
+    return rip->numEntries * 20 + 4;
 }
