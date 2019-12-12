@@ -21,7 +21,8 @@ extern uint32_t Mask(uint32_t len);
 
 extern uint32_t netAddr(RoutingTableEntry now);
 
-uint32_t BigToSmallEndien(uint32_t x){
+uint32_t BigToSmallEndien(uint32_t x)
+{
 	return ((x & 0xff000000) >> 24) | ((x & 0x00ff0000) >> 8) | ((x & 0x0000ff00) << 8) | ((x & 0x000000ff) << 24);
 }
 
@@ -86,10 +87,12 @@ void init_output(int k,RipPacket rip){
 			printf("WRONG! DST_MAC NOT FOUND!");
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[])
+{
 	// 0a.
 	int res = HAL_Init(1, addrs);
-	if (res < 0){
+	if (res < 0)
+	{
 		return res;
 	}
 
@@ -99,7 +102,8 @@ int main(int argc, char *argv[]){
 	// 10.0.1.0/24 if 1
 	// 10.0.2.0/24 if 2
 	// 10.0.3.0/24 if 3
-	for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++){
+	for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++)
+	{
 		RoutingTableEntry entry = {
 			.addr = addrs[i], // big endian
 			.len = 24,        // small endian
@@ -112,7 +116,8 @@ int main(int argc, char *argv[]){
 	}
 
 	//MY CODE START.................................................................................................
-	for (int k = 0; k < N_IFACE_ON_BOARD; k++){
+	for (int k = 0; k < N_IFACE_ON_BOARD; k++)
+	{
 		RipPacket rip;
 		rip.command = 1;
 		rip.numEntries = 1;
@@ -122,10 +127,17 @@ int main(int argc, char *argv[]){
 		rip.entries[0].nexthop = 0;
 		init_output(k,rip);
 	}
+	//MY CODE END.................................................................................................
+
+
+
+	
 
 	uint64_t last_time = 0;
-	while (1){
-		for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++){
+	while (1)
+	{
+		for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++)
+		{
 			RoutingTableEntry entry = {
 				.addr = addrs[i], // big endian
 				.len = 24,        // small endian
@@ -134,9 +146,11 @@ int main(int argc, char *argv[]){
 				.metric = BigToSmallEndien(1u)
 			};
 			update(true, entry);
+			//printf("addrs[%u] = %x\n", i, addrs[i]);
 		}
 		uint64_t time = HAL_GetTicks();
-		if (time > last_time + 5 * 1000){
+		if (time > last_time + 5 * 1000)
+		{
 			// What to do?
 			// send complete routing table to every interface
 			// ref. RFC2453 3.8
@@ -145,16 +159,19 @@ int main(int argc, char *argv[]){
 			//responce
 			// multicast MAC for 224.0.0.9 is 01:00:5e:00:00:09
 			printf("Timer response RoutingTable:\n");
-			for (int i = 0; i < RoutingTable.size(); i++){
+			for (int i = 0; i < RoutingTable.size(); i++)
+			{
 				RoutingTableEntry tmp = RoutingTable[i];
 				printf("addr: %x , len: %u , if_index: %u , nexthop: %x , metric: %u\n", tmp.addr, tmp.len, tmp.if_index, tmp.nexthop, BigToSmallEndien(tmp.metric));
 			}
 
-			for (int k = 0; k < N_IFACE_ON_BOARD; k++){
+			for (int k = 0; k < N_IFACE_ON_BOARD; k++)
+			{
 				RipPacket rip;
 				rip.command = 2;
 				rip.numEntries = 0;
-				for (int i = 0; i < RoutingTable.size(); i++){
+				for (int i = 0; i < RoutingTable.size(); i++)
+				{
 					if ((addrs[k] & Mask(RoutingTable[i].len)) == (RoutingTable[i].addr&Mask(RoutingTable[i].len)))
 						continue;
 					if (RoutingTable[i].nexthop == addrs[k])
@@ -169,6 +186,8 @@ int main(int argc, char *argv[]){
 				}
 				init_output(k, rip);
 			}
+
+			//MY CODE END.................................................................................................
 			printf("5s Timer\n");
 			last_time = time;
 		}
@@ -179,19 +198,24 @@ int main(int argc, char *argv[]){
 		int if_index;
 		res = HAL_ReceiveIPPacket(mask, packet, sizeof(packet), src_mac, dst_mac,
 			1000, &if_index);
-		if (res == HAL_ERR_EOF){
+		if (res == HAL_ERR_EOF)
+		{
 			printf("HAL_ERR_EOF\n");
 			break;
 		}
-		else if (res < 0){
+		else if (res < 0)
+		{
+			printf("res<0\n");
 			return res;
 		}
-		else if (res == 0){
+		else if (res == 0)
+		{
 			// Timeout
 			printf("Timeout!\n");
 			continue;
 		}
-		else if (res > sizeof(packet)){
+		else if (res > sizeof(packet))
+		{
 			printf("Truncated!\n");
 			// packet is truncated, ignore it
 			continue;
@@ -199,79 +223,114 @@ int main(int argc, char *argv[]){
 
 
 		// 1. validate
-		if (!validateIPChecksum(packet, res)){
+		if (!validateIPChecksum(packet, res))
+		{
 			printf("Invalid IP Checksum\n");
 			continue;
 		}
-		in_addr_t src_addr = 0, dst_addr = 0, mc_addr = 0;
+		in_addr_t src_addr, dst_addr, mc_addr;
 		// extract src_addr and dst_addr from packet
 		// big endian
+		//MY CODE START.................................................................................................
 
-		for(int i=15;i>11;i--){
-			src_addr <<= 8;
-			src_addr += packet[i];
-		}
-		for(int i=19;i>15;i--){
-			dst_addr <<= 8;
-			dst_addr += packet[i];
-		}
+		//printf("Packet:");
+		//for (int i = 0; i < res; i++)
+		//	printf("%x ", packet[i]);
+		src_addr = 0;
+		src_addr += packet[15];
+		src_addr <<= 8;
+		src_addr += packet[14];
+		src_addr <<= 8;
+		src_addr += packet[13];
+		src_addr <<= 8;
+		src_addr += packet[12];
+
+		dst_addr = 0;
+		dst_addr += packet[19];
+		dst_addr <<= 8;
+		dst_addr += packet[18];
+		dst_addr <<= 8;
+		dst_addr += packet[17];
+		dst_addr <<= 8;
+		dst_addr += packet[16];
+
 		mc_addr = 0x090000E0;
+
+		//MY CODE END.................................................................................................
 		// 2. check whether dst is me
 		bool dst_is_me = false;
-		for (int i = 0; i < N_IFACE_ON_BOARD; i++){
-			if (memcmp(&dst_addr, &addrs[i], sizeof(in_addr_t)) == 0){
+		for (int i = 0; i < N_IFACE_ON_BOARD; i++)
+		{
+			if (memcmp(&dst_addr, &addrs[i], sizeof(in_addr_t)) == 0)
+			{
 				dst_is_me = true;
 				break;
 			}
-			if (memcmp(&dst_addr, &mc_addr, sizeof(in_addr_t)) == 0){
+			//MY CODE START.................................................................................................
+			if (memcmp(&dst_addr, &mc_addr, sizeof(in_addr_t)) == 0)
+			{
 				dst_is_me = true;
 				break;
 			}
+			//MY CODE END.................................................................................................
 		}
 		// TODO: Handle rip multicast address(224.0.0.9)?
 		//printf("src: %x \ndst: %x \nif_index: %d\n", src_addr, dst_addr, if_index);
-		if (dst_is_me){
+		if (dst_is_me)
+		{
 			// 3a.1
 			RipPacket rip;
 			// check and validate
-			if (disassemble(packet, res, &rip)){
-				if (rip.command == 1){
+			if (disassemble(packet, res, &rip))
+			{
+				if (rip.command == 1)
+				{
 					printf("handing request....\n");
 					//检验是否为请求报文，判断度量值是否为16，地址族标识是否为0；
-					if (rip.numEntries != 1){
+					//MY CODE START.................................................................................................
+					if (rip.numEntries != 1)
+					{
 						printf("ERROR! numEntries not 1\n");
 						continue;
 					}
-					if (BigToSmallEndien(rip.entries[0].metric) != 16){
+					if (BigToSmallEndien(rip.entries[0].metric) != 16)
+					{
 						printf("ERROR! metric is not 16\n");
 						continue;
 					}
+					//MY CODE END.................................................................................................
 					// 3a.3 request, ref. RFC2453 3.9.1
 					// only need to respond to whole table requests in the lab
 					// 封装和源ip地址不在同一网段
+					//MYCODE START .................................................................................................
 					RipPacket resp;
 					resp.command = 2;
 					resp.numEntries = 0;
-					for (int i = 0; i < RoutingTable.size(); i++){
-						if (netAddr(RoutingTable[i]) == (src_addr&Mask(RoutingTable[i].len))){
+					for (int i = 0; i < RoutingTable.size(); i++)
+					{
+						if (netAddr(RoutingTable[i]) == (src_addr&Mask(RoutingTable[i].len)))//!@#@@!#@!@#TODO ----BUG
+						{
 							if (RoutingTable[i].if_index == if_index)
 								continue;
 							resp.entries[resp.numEntries].addr = RoutingTable[i].addr&Mask(RoutingTable[i].len);
 							resp.entries[resp.numEntries].mask = Mask(RoutingTable[i].len);
 							resp.entries[resp.numEntries].nexthop = RoutingTable[i].nexthop;
-							resp.entries[resp.numEntries].metric = RoutingTable[i].metric;
+							resp.entries[resp.numEntries].metric = RoutingTable[i].metric;//应该是几？？？TODO
 							resp.numEntries++;
 						}
 					}
 					printf("RoutingTable:\n");
-					for (int i = 0; i < RoutingTable.size(); i++){
+					for (int i = 0; i < RoutingTable.size(); i++)
+					{
 						RoutingTableEntry tmp = RoutingTable[i];
-						printf("addr: %x  len: %u   index: %u  nexthop: %x  metric: %u\n", tmp.addr, tmp.len, tmp.if_index, tmp.nexthop, BigToSmallEndien(tmp.metric));
+						printf("addr: %x , len: %u , if_index: %u , nexthop: %x , metric: %u\n", tmp.addr, tmp.len, tmp.if_index, tmp.nexthop, BigToSmallEndien(tmp.metric));
 					}
+					//MY CODE END.................................................................................................
 					// TODO: fill resp
 					// assemble
 					// IP
 					output[0] = 0x45;
+					//MY CODE START.................................................................................................
 					output[1] = 0x00;//TOS
 					//2-3 total len
 					uint32_t totlen = 20 + 8 + 4 + resp.numEntries * 20;
@@ -318,17 +377,21 @@ int main(int argc, char *argv[]){
 					// send it back
 					HAL_SendIPPacket(if_index, output, rip_len + 20 + 8, src_mac);
 				}
-				else{
+				else
+				{
 					// 3a.2 response, ref. RFC2453 3.9.2
+					//MY CODE START.....................................................................
 					printf("handling response...\n");
 					bool updated = false;
-					for (int i = 0; i < rip.numEntries; i++){
+					for (int i = 0; i < rip.numEntries; i++)
+					{
 						uint32_t curMetric = rip.entries[i].metric;
 						uint32_t addr = rip.entries[i].addr;
 						uint32_t mask = rip.entries[i].mask;
 						uint32_t len = __builtin_popcount(mask);
 						uint32_t nexthop = rip.entries[i].nexthop;
-						if (nexthop == 0){
+						if (nexthop == 0)
+						{
 							nexthop = src_addr;
 						}
 						curMetric = BigToSmallEndien(curMetric);
@@ -336,10 +399,13 @@ int main(int argc, char *argv[]){
 						//查路由表
 						bool found = false;
 						for (int j = 0; j < RoutingTable.size(); j++)
-							if (len == RoutingTable[j].len){
-								if (netAddr(RoutingTable[j]) == (Mask(len)&addr)){
+							if (len == RoutingTable[j].len)
+							{
+								if (netAddr(RoutingTable[j]) == (Mask(len)&addr))
+								{
 									found = true;
-									if (curMetric >= 16&&nexthop==RoutingTable[j].nexthop){
+									if (curMetric >= 16&&nexthop==RoutingTable[j].nexthop)
+									{
 										RoutingTableEntry del_tmp;
 										del_tmp.addr=addr;
 										del_tmp.len = len;
@@ -347,7 +413,8 @@ int main(int argc, char *argv[]){
 										printf("deleting Route\n");
 										break;
 									}
-									if (curMetric <= BigToSmallEndien(RoutingTable[j].metric)){
+									if (curMetric <= BigToSmallEndien(RoutingTable[j].metric))
+									{
 										//update
 										updated = true;
 										RoutingTable[j].addr = addr;
@@ -360,7 +427,8 @@ int main(int argc, char *argv[]){
 									break;
 								}
 							}
-						if (!found&&curMetric<16){
+						if (!found&&curMetric<16)
+						{
 							updated = true;
 							RoutingTableEntry tmp;
 							tmp.addr = addr;
@@ -373,7 +441,8 @@ int main(int argc, char *argv[]){
 						}
 
 					}
-					for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++){
+					for (uint32_t i = 0; i < N_IFACE_ON_BOARD; i++)
+					{
 						RoutingTableEntry entry = {
 							.addr = addrs[i], // big endian
 							.len = 24,        // small endian
@@ -384,13 +453,16 @@ int main(int argc, char *argv[]){
 						update(true, entry);
 						//printf("addrs[%u] = %x\n", i, addrs[i]);
 					}
-					if (updated){
+					if (updated)
+					{
 						printf("RoutingTable updated!\n");
-						for (int k = 0; k < N_IFACE_ON_BOARD; k++){
+						for (int k = 0; k < N_IFACE_ON_BOARD; k++)
+						{
 							RipPacket rip;
 							rip.command = 2;
 							rip.numEntries = 0;
-							for (int i = 0; i < RoutingTable.size(); i++){
+							for (int i = 0; i < RoutingTable.size(); i++)
+							{
 								if ((addrs[k] & Mask(RoutingTable[i].len)) == (RoutingTable[i].addr&Mask(RoutingTable[i].len)))
 									continue;
 								if (RoutingTable[i].nexthop == addrs[k])
@@ -407,7 +479,8 @@ int main(int argc, char *argv[]){
 						}
 					}
 					printf("RoutingTable:\n");
-					for (int i = 0; i < RoutingTable.size(); i++){
+					for (int i = 0; i < RoutingTable.size(); i++)
+					{
 						RoutingTableEntry tmp = RoutingTable[i];
 						printf("addr: %x , len: %u , if_index: %u , nexthop: %x , metric: %u\n", tmp.addr, tmp.len, tmp.if_index, tmp.nexthop, BigToSmallEndien(tmp.metric));
 					}
@@ -423,43 +496,52 @@ int main(int argc, char *argv[]){
 			else
 				printf("ERROR! DURING DISASSEMBLE VALIDATION!\n");
 		}
-		else{
-		// printf("SHOULD FORWARD!\n");
+		else
+		{
+		printf("SHOULD FORWARD!\n");
 			// 3b.1 dst is not me
 			// forward
 			// beware of endianness
 			uint32_t nexthop, dest_if, metric;
-			if (query(dst_addr, &nexthop, &dest_if, &metric)){
+			if (query(dst_addr, &nexthop, &dest_if, &metric))
+			{
 				// found
 				macaddr_t dest_mac;
 				// direct routing
-				if (nexthop == 0){
+				if (nexthop == 0)
+				{
 					nexthop = dst_addr;
 				}
 				printf("dest_if = %u, nexthop = %x\n", dest_if, nexthop);
-				if (HAL_ArpGetMacAddress(dest_if, nexthop, dest_mac) == 0){
+				if (HAL_ArpGetMacAddress(dest_if, nexthop, dest_mac) == 0)
+				{
 					// found
 					memcpy(output, packet, res);
 					// update ttl and checksum
 					// TODO: you might want to check ttl=0 case
+					//MY CODE START.......................................................................
 					bool ok = forward(output, res);
-					if (!ok){
+					if (!ok)
+					{
 						printf("ERROR! checksum wrong or TTL = 0");
 						continue;
 					}
-					else{
+					else
+					{
 						printf("FORWARDING PACKET!\n");
 						HAL_SendIPPacket(dest_if, output, res, dest_mac);
 					}
+					//MY CODE END.....................................................................
 				}
-				else{
+				else
+				{
 					// not found
 					// you can drop it
 					printf("ARP not found for %x\n", nexthop);
 				}
 			}
-			else{
-
+			else
+			{
 				// not found
 				// optionally you can send ICMP Host Unreachable
 				printf("IP not found for %x\n", src_addr);
