@@ -47,7 +47,7 @@ uint32_t Netaddr(RoutingTableEntry now)
 void update(bool insert, RoutingTableEntry entry) {
   if(insert){
     for(int i=0;i<RoutingTable.size();i++){
-      if(RoutingTable[i].addr==entry.addr && RoutingTable[i].len==entry.len){
+      if(RoutingTable[i].len == entry.len&&(RoutingTable[i].addr&Mask(entry.len)) == (entry.addr&Mask(entry.len))){
         RoutingTable[i] = entry;
         return;
       }
@@ -57,7 +57,7 @@ void update(bool insert, RoutingTableEntry entry) {
   }
   else{
     for(int i=0;i<RoutingTable.size();i++){
-      if(RoutingTable[i].addr==entry.addr && RoutingTable[i].len==entry.len){
+      if(RoutingTable[i].len == entry.len && (RoutingTable[i].addr&Mask(entry.len)) == (entry.addr&Mask(entry.len))){
         RoutingTable.erase(RoutingTable.begin()+i);
         return;
       }
