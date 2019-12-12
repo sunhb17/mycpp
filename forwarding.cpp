@@ -14,8 +14,9 @@ using namespace std;
  * @return 校验和无误则返回 true ，有误则返回 false
  */
 
-bool validateIPChecksum2(uint8_t *packet, size_t len) {
-	unsigned int ans = (packet[10]<<8) + packet[11];
+bool validChecksum(uint8_t *packet, size_t len) {
+	unsigned int ans = (packet[11]<<8) + packet[10];
+	uint16_t p10 = packet[10], p11 = packet[11];
 	unsigned short check_sum = 0;
 	unsigned int checksum = 0;
 
@@ -25,14 +26,14 @@ bool validateIPChecksum2(uint8_t *packet, size_t len) {
 	int ip_len = (packet[0] << 2) % 64;
 
 	for(int i=0;i<ip_len;i+=2){
-		checksum += ((packet[i] << 8) + packet[i+1]);
+		checksum += ((packet[i+1] << 8) + packet[i]);
 		while(checksum>>16!=0){
 			checksum = (checksum & 0xffff) + (checksum >> 16);
 		}
 	}
 	check_sum = ~checksum;
-	packet[11] = ans % 256;
-	packet[10] = ans >> 8;
+	packet[11] = p11;
+	packet[10] = p10;
 	if(check_sum==ans)
 		return true;
 	else
@@ -40,8 +41,7 @@ bool validateIPChecksum2(uint8_t *packet, size_t len) {
 
 }
 
-pair<bool, uint16_t> validateIPChecksum1(uint8_t *packet, size_t len) {
-	// TODO:
+uint16_t getChecksum(uint8_t *packet, size_t len) {
 	uint32_t Checksum = 0;
 	uint16_t p10 = packet[10], p11 = packet[11];
 	size_t tmp_len = packet[0] & 0xf;
@@ -66,39 +66,22 @@ pair<bool, uint16_t> validateIPChecksum1(uint8_t *packet, size_t len) {
 	packet -= IHL * 4;
 	packet[10] = p10;
 	packet[11] = p11;
-	/*for (int i = 0; i < IHL*4; i++)
-		cout << hex << (uint16_t)packet[i] << " ";
-	cout << endl;
-	cout << hex << p10 << " " << p11 << " " << ans1 << " " << ans2 << " " << ~ans1 << " " << ~ans2 << endl;*/
-	//cout <<hex<< ans2 << endl;
-	return pair<bool, uint16_t>{flag, ans2};
+	return ans2;
 }
 
 
 bool forward(uint8_t *packet, size_t len) {
-	if(validateIPChecksum2(packet,len)==false)
+	if(validChecksum(packet,len)==false)
 		return false;
 
 	unsigned int checksum = 0;
 	unsigned short check_sum = 0;
 
-	packet[8] -= 1;
+	packet[8] --;
+	uint16_t ans = getChecksum(packet, len);
+	
+	packet[10] = ans & 0xff;
+	packet[11] = ((ans & 0xff00) >> 8);
 
-	packet[10] = 0;
-	packet[11] = 0;
-
-	int ip_len = (packet[0] << 2) % 64;
-
-
-	for(int i=0;i<ip_len;i+=2){
-		checksum += ((packet[i] << 8) + packet[i+1]);
-		while(checksum>>16!=0){
-			checksum = (checksum & 0xffff) + (checksum >> 16);
-		}
-	}
-
-	check_sum = ~checksum;
-	packet[11] = (check_sum & 0xff);
-	packet[10] = (check_sum & 0xffff) >> 8;
 	return true;
 }

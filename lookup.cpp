@@ -38,7 +38,7 @@ uint32_t Mask(uint32_t len)
   return (1 << len) - 1;
 }
 
-uint32_t Netaddr(RoutingTableEntry now)
+uint32_t netAddr(RoutingTableEntry now)
 {
   return Mask(now.len) & now.addr;
 }
@@ -101,7 +101,7 @@ bool query(uint32_t addr, uint32_t *nexthop, uint32_t *if_index, uint32_t *metri
   int locate = -1;
 
   for (int i=0;i<RoutingTable.size();i++){
-    uint32_t _addr = Netaddr(RoutingTable[i]);
+    uint32_t _addr = netAddr(RoutingTable[i]);
     if(RoutingTable[i].len<=m_len)continue;
     else if(_addr == (Mask(RoutingTable[i].len)&addr)){
       locate = i;
