@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <utility>
+#include <iostream>
+#include<utility>
 using namespace std;
 /**
  * @brief 进行转发时所需的 IP 头的更新：
@@ -12,43 +12,51 @@ using namespace std;
  * @param len 即 packet 的长度，单位为字节
  * @return 校验和无误则返回 true ，有误则返回 false
  */
-uint16_t get_checksum(uint8_t *packet, size_t len){
-    int packet10 = packet[10];
-    int packet11 = packet[11];
-    packet[10] = 0;
-    packet[11] = 0;
-    int checksum = 0;
-    //分组相加
-    int head_len = packet[0] % 0x10 * 4;
-    int arry[head_len/2+1];
-    for(int i = 0; i < head_len/2; i++){
-        arry[i] = 0;
-    }
-    for(int i = 0; i < head_len; i++){
-        i%2 == 1 ? arry[i/2] += packet[i] * 0x100 : arry[i/2] += packet[i];
-    }
-    //处理溢出
-    for(int i = 0; i < head_len/2; i++){
-        checksum += arry[i]; 
-    }
-    while(checksum > 0xffff){
-        int temp = checksum / 0x10000;
-        checksum %= 0x10000;
-        checksum += temp;
-    }
-    packet[10] = packet10;
-    packet[11] = packet11;
-    return 0xffff-checksum;
+pair<bool, uint16_t> validateIPChecksum1(uint8_t *packet, size_t len) {
+	// TODO:
+	uint32_t Checksum = 0;
+	uint16_t p10 = packet[10], p11 = packet[11];
+	size_t tmp_len = packet[0] & 0xf;
+	size_t IHL = tmp_len;
+	tmp_len *= 4;
+	packet[10] = packet[11] = 0;
+	while (tmp_len > 1)
+	{
+		Checksum += *(uint16_t *)packet;
+		while (Checksum >> 16)
+			Checksum = (Checksum >> 16) + (Checksum & 0xffff);
+		tmp_len -= 2;
+		packet++;
+		packet++;
+	}
+	bool flag = true;
+	uint16_t p1011 = (p10)+(p11 << 8);
+	uint16_t ans1 = p1011, ans2 = Checksum;
+	ans2 = ~ans2;
+	if (ans1 != ans2)
+		flag = false;
+	packet -= IHL * 4;
+	packet[10] = p10;
+	packet[11] = p11;
+	/*for (int i = 0; i < IHL*4; i++)
+		cout << hex << (uint16_t)packet[i] << " ";
+	cout << endl;
+	cout << hex << p10 << " " << p11 << " " << ans1 << " " << ans2 << " " << ~ans1 << " " << ~ans2 << endl;*/
+	//cout <<hex<< ans2 << endl;
+	return pair<bool, uint16_t>{flag, ans2};
 }
 
 bool forward(uint8_t *packet, size_t len) {
-    //printf("%02x\n", packet[8]);
-    uint16_t checksum_old = packet[11]*0x100 + packet[10];
-	if(get_checksum(packet, len) != checksum_old) return false;
-    //TTL减1
-    packet[8] -= 1;
-    uint16_t checksum = get_checksum(packet, len);
-    packet[11] = checksum / 0x100;
-    packet[10] = checksum % 0x100;
-    return true;
+	// TODO:
+	if (validateIPChecksum1(packet, len).first)
+	{
+		packet[8] --;
+		pair<bool, uint16_t> tmp = validateIPChecksum1(packet, len);
+		packet[10] = tmp.second & 0xff;
+		packet[11] = ((tmp.second & 0xff00) >> 8);
+		//cout<<hex << tmp.second << " " << (tmp.second & 0xff) << " " << (tmp.second & 0xff00) << endl;
+		return true;
+	}
+	else
+		return false;
 }

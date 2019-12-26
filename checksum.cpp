@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
+#include <iostream>
+using namespace std;
+
 /**
  * @brief 进行 IP 头的校验和的验证
  * @param packet 完整的 IP 头和载荷
@@ -8,33 +10,34 @@
  * @return 校验和无误则返回 true ，有误则返回 false
  */
 bool validateIPChecksum(uint8_t *packet, size_t len) {
-  // TODO:
-    int checksum_old = packet[11]*0x100 + packet[10];
-    int packet10 = packet[10];
-    int packet11 = packet[11];
-    packet[10] = 0;
-    packet[11] = 0;
-    int checksum = 0;
-    //分组相加
-    int head_len = packet[0] % 0x10 * 4;
-    int arry[head_len/2+1];
-    for(int i = 0; i < head_len/2; i++){
-        arry[i] = 0;
-    }
-    for(int i = 0; i < head_len; i++){
-        i%2 == 1 ? arry[i/2] += packet[i] * 0x100 : arry[i/2] += packet[i];
-    }
-    //处理溢出
-    for(int i = 0; i < head_len/2; i++){
-        checksum += arry[i]; 
-    }
-    while(checksum > 0xffff){
-        int temp = checksum / 0x10000;
-        checksum %= 0x10000;
-        checksum += temp;
-    }
-    checksum += checksum_old;
-    packet[10] = packet10;
-    packet[11] = packet11;
-    return (checksum == 0xffff );
+	// TODO:
+	uint32_t Checksum = 0;
+	uint16_t p10 = packet[10], p11 = packet[11];
+	size_t tmp_len = packet[0]&0xf;
+  size_t IHL = tmp_len;
+  tmp_len*=4;
+	packet[10] = packet[11] = 0;
+	while (tmp_len > 1)
+	{
+		Checksum += *(uint16_t *)packet;
+		while (Checksum >> 16)
+			Checksum = (Checksum >> 16) + (Checksum & 0xffff);
+		tmp_len -= 2;
+		packet++;
+		packet++;
+	}
+	bool flag = true;
+	uint16_t p1011 = (p10)+(p11 << 8);
+	uint16_t ans1 = p1011, ans2 = Checksum;
+	ans2 = ~ans2;
+	if (ans1 != ans2)
+		flag = false;
+	packet -= IHL*4;
+	packet[10] = p10;
+	packet[11] = p11;
+	/*for (int i = 0; i < IHL*4; i++)
+		cout << hex << (uint16_t)packet[i] << " ";
+	cout << endl;
+	cout << hex << p10 << " " << p11 << " " << ans1 << " " << ans2 << " " << ~ans1 << " " << ~ans2 << endl;*/
+	return flag;
 }
